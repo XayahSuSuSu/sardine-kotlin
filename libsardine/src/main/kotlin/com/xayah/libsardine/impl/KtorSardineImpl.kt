@@ -16,7 +16,9 @@ import com.xayah.libsardine.model.Prop
 import com.xayah.libsardine.model.Propfind
 import com.xayah.libsardine.model.Resourcetype
 import com.xayah.libsardine.util.KotlinSardineUtil
+import com.xayah.libsardine.util.copyTo
 import io.ktor.client.HttpClient
+import io.ktor.client.content.ProgressListener
 import io.ktor.client.engine.ProxyConfig
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.auth.Auth
@@ -24,23 +26,37 @@ import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.basic
 import io.ktor.client.plugins.auth.providers.bearer
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.utils.io.ByteWriteChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import nl.adaptivity.xmlutil.XmlUtilInternal
+import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import javax.xml.namespace.QName
 
 @OptIn(XmlUtilInternal::class)
 class KtorSardineImpl : KtorSardine {
+    companion object {
+        private const val DEFAULT_TIMEOUT = 15000L
+    }
     private var client: HttpClient
     private var methods: KtorMethods
 
     private suspend fun <T> withIOContext(block: suspend CoroutineScope.() -> T): T =
         withContext(Dispatchers.IO, block)
 
-    constructor() {
-        this.client = HttpClient(CIO)
+    constructor(requestTimeout: Long = 15000) {
+        this.client = HttpClient(CIO) {
+            engine {
+                this.requestTimeout = requestTimeout
+            }
+        }
         this.methods = KtorMethods(this.client)
     }
 
@@ -49,8 +65,12 @@ class KtorSardineImpl : KtorSardine {
         this.methods = KtorMethods(this.client)
     }
 
-    constructor(accessToken: String) {
+    constructor(accessToken: String, requestTimeout: Long = DEFAULT_TIMEOUT) {
         this.client = HttpClient(CIO) {
+            engine {
+                this.requestTimeout = requestTimeout
+            }
+
             install(Auth) {
                 bearer {
                     loadTokens {
@@ -62,8 +82,12 @@ class KtorSardineImpl : KtorSardine {
         this.methods = KtorMethods(this.client)
     }
 
-    constructor(username: String, password: String) {
+    constructor(username: String, password: String, requestTimeout: Long = DEFAULT_TIMEOUT) {
         this.client = HttpClient(CIO) {
+            engine {
+                this.requestTimeout = requestTimeout
+            }
+
             install(Auth) {
                 basic {
                     credentials {
@@ -75,10 +99,11 @@ class KtorSardineImpl : KtorSardine {
         this.methods = KtorMethods(this.client)
     }
 
-    constructor(username: String, password: String, proxyConfig: ProxyConfig) {
+    constructor(username: String, password: String, proxyConfig: ProxyConfig, requestTimeout: Long = DEFAULT_TIMEOUT) {
         this.client = HttpClient(CIO) {
             engine {
-                proxy = proxyConfig
+                this.requestTimeout = requestTimeout
+                this.proxy = proxyConfig
             }
 
             install(Auth) {
@@ -94,22 +119,15 @@ class KtorSardineImpl : KtorSardine {
 
     @Throws(IOException::class)
     override suspend fun list(url: String): List<DavResource> {
-        return this.list(url, 1)
+        return list(url, 1)
     }
 
+    @Throws(IOException::class)
     override suspend fun list(url: String, depth: Int): List<DavResource> {
         return list(url, depth, true)
     }
 
-    private fun addCustomProperties(prop: Prop, props: Set<QName>) {
-        val any = prop.any.toMutableList()
-        for (entry in props) {
-            val element = KotlinSardineUtil.createElement(entry)
-            any.add(element)
-        }
-        prop.any = any
-    }
-
+    @Throws(IOException::class)
     override suspend fun list(url: String, depth: Int, props: Set<QName>): List<DavResource> {
         val body = Propfind()
         val prop = Prop()
@@ -126,6 +144,7 @@ class KtorSardineImpl : KtorSardine {
         return propfind(url, depth, body)
     }
 
+    @Throws(IOException::class)
     override suspend fun list(url: String, depth: Int, allProp: Boolean): List<DavResource> {
         if (allProp) {
             val body = Propfind()
@@ -136,6 +155,7 @@ class KtorSardineImpl : KtorSardine {
         }
     }
 
+    @Throws(IOException::class)
     override suspend fun propfind(url: String, depth: Int, props: Set<QName>): List<DavResource> {
         val body = Propfind()
         val prop = Prop()
@@ -144,7 +164,176 @@ class KtorSardineImpl : KtorSardine {
         return propfind(url, depth, body)
     }
 
-    suspend fun propfind(url: String, depth: Int, body: Propfind): List<DavResource> = withIOContext {
-            KtorHandler.responses(KtorHandler.multiStatus(methods.propfind(url, depth, body)))
+    @Throws(IOException::class)
+    override suspend fun <T> get(url: String, listener: ProgressListener?, block: suspend (response: HttpResponse) -> T): T {
+        return get(url, mapOf(), listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun <T> get(url: String, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> T): T {
+        return methods.get(url, headers, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, data: ByteArray, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        put(url, data, null, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, dataStream: InputStream, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        put(url, dataStream, null, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, onWriting: suspend (channel: ByteWriteChannel) -> Unit, block: suspend (response: HttpResponse) -> Unit) {
+        put(
+            url = url,
+            onWriting = onWriting,
+            contentLength = null,
+            contentType = null,
+            headers = emptyMap(),
+            block = block
+        )
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, data: ByteArray, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        put(url, ByteArrayInputStream(data), contentType, true, data.size.toLong(), listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        put(url, dataStream, contentType, true, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        // If contentLength is null, the resources will be sent as `Transfer-Encoding: chunked`
+        put(url, dataStream, contentType, expectContinue, null, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, contentLength: Long?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        val headers: MutableMap<String, String> = mutableMapOf()
+        if (expectContinue) {
+            headers[HttpHeaders.Expect] = "100-continue"
         }
+        put(url, dataStream, contentLength, contentType, headers, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, dataStream: InputStream, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        put(url, dataStream, null, null, headers, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, localFile: File, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        // Don't use ExpectContinue for repeatable FileEntity, some web server (IIS for example) may return 400 bad request after retry
+        put(url, localFile, contentType, false, listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun put(url: String, localFile: File, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+        put(url, localFile.inputStream(), contentType, expectContinue, localFile.length(), listener, block)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun delete(url: String) {
+        delete(url, emptyMap())
+    }
+
+    @Throws(IOException::class)
+    override suspend fun delete(url: String, headers: Map<String, String>) {
+        methods.delete(url, headers)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun createDirectory(url: String) {
+        methods.createDirectory(url)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun move(sourceUrl: String, destinationUrl: String) {
+        move(sourceUrl, destinationUrl, true)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean) {
+        move(sourceUrl, destinationUrl, overwrite, emptyMap())
+    }
+
+    @Throws(IOException::class)
+    override suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>) {
+        methods.move(sourceUrl, destinationUrl, overwrite, headers)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun copy(sourceUrl: String, destinationUrl: String) {
+        copy(sourceUrl, destinationUrl, true)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean) {
+        copy(sourceUrl, destinationUrl, overwrite, emptyMap())
+    }
+
+    @Throws(IOException::class)
+    override suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>) {
+        methods.copy(sourceUrl, destinationUrl, overwrite, headers)
+    }
+
+    @Throws(IOException::class)
+    override suspend fun exists(url: String): Boolean = methods.exists(url)
+
+
+    @Throws(IOException::class)
+    private fun addCustomProperties(prop: Prop, props: Set<QName>) {
+        val any = prop.any.toMutableList()
+        for (entry in props) {
+            val element = KotlinSardineUtil.createElement(entry)
+            any.add(element)
+        }
+        prop.any = any
+    }
+
+    @Throws(IOException::class)
+    private suspend fun propfind(url: String, depth: Int, body: Propfind): List<DavResource> = withIOContext {
+        KtorHandler.responses(KtorHandler.multiStatus(methods.propfind(url, depth, body)))
+    }
+
+    @Throws(IOException::class)
+    private suspend fun put(
+        url: String,
+        dataStream: InputStream,
+        contentLength: Long?,
+        contentType: ContentType?,
+        headers: Map<String, String>,
+        listener: ProgressListener?,
+        block: suspend (response: HttpResponse) -> Unit
+    ) {
+        put(
+            url = url,
+            onWriting = { channel ->
+                dataStream.copyTo(channel) { copied ->
+                    listener?.invoke(copied, contentLength ?: -1)
+                }
+            },
+            contentLength = contentLength,
+            contentType = contentType,
+            headers = headers,
+            block = block
+        )
+    }
+
+    @Throws(IOException::class)
+    private suspend fun put(
+        url: String,
+        onWriting: suspend (channel: ByteWriteChannel) -> Unit,
+        contentLength: Long?,
+        contentType: ContentType?,
+        headers: Map<String, String>,
+        block: suspend (response: HttpResponse) -> Unit
+    ) {
+        methods.put(url, onWriting, contentLength, contentType, headers, block)
+    }
 }

@@ -1,6 +1,12 @@
 package com.xayah.libsardine
 
+import io.ktor.client.content.ProgressListener
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
+import io.ktor.utils.io.ByteWriteChannel
+import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import javax.xml.namespace.QName
 
 /**
@@ -18,6 +24,7 @@ interface KtorSardine {
      * @return List of resources for this URI including the parent resource itself
      * @throws IOException I/O error or HTTP response validation failure
      */
+    @Throws(IOException::class)
     suspend fun list(url: String): List<DavResource>
 
     /**
@@ -29,6 +36,7 @@ interface KtorSardine {
      * @return List of resources for this URI including the parent resource itself
      * @throws IOException I/O error or HTTP response validation failure
      */
+    @Throws(IOException::class)
     suspend fun list(url: String, depth: Int): List<DavResource>
 
     /**
@@ -41,6 +49,7 @@ interface KtorSardine {
      * @return List of resources for this URI including the parent resource itself
      * @throws IOException I/O error or HTTP response validation failure
      */
+    @Throws(IOException::class)
     suspend fun list(url: String, depth: Int, props: Set<QName>): List<DavResource>
 
     /**
@@ -54,6 +63,7 @@ interface KtorSardine {
      * @return List of resources for this URI including the parent resource itself
      * @throws IOException I/O error or HTTP response validation failure
      */
+    @Throws(IOException::class)
     suspend fun list(url: String, depth: Int, allProp: Boolean): List<DavResource>
 
     /**
@@ -67,5 +77,251 @@ interface KtorSardine {
      * @return List of resources for this URI including the parent resource itself
      * @throws IOException I/O error or HTTP response validation failure
      */
+    @Throws(IOException::class)
     suspend fun propfind(url: String, depth: Int, props: Set<QName>): List<DavResource>
+
+    /**
+     * Uses HTTP `GET` to download data from a server. The stream must be closed after reading.
+     *
+     * @param url Path to the resource including protocol and hostname
+     * @param listener Callback that can be registered to listen for upload/ download progress, see [io.ktor.client.content.ProgressListener]
+     * @param block See [io.ktor.client.statement.HttpStatement.execute]
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun <T> get(url: String, listener: ProgressListener? = null, block: suspend (response: HttpResponse) -> T): T
+
+    /**
+     * Uses HTTP `GET` to download data from a server. The stream must be closed after reading.
+     *
+     * @param url     Path to the resource including protocol and hostname
+     * @param headers Additional HTTP headers to add to the request
+     * @param listener Callback that can be registered to listen for upload/ download progress, see [io.ktor.client.content.ProgressListener]
+     * @param block See [io.ktor.client.statement.HttpStatement.execute]
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun <T> get(url: String, headers: Map<String, String>, listener: ProgressListener? = null, block: suspend (response: HttpResponse) -> T): T
+
+    /**
+     * Uses HTTP `PUT` to send data to a server. Repeatable on authentication failure.
+     *
+     * @param url  Path to the resource including protocol and hostname (must not point to a directory)
+     * @param data Input source
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, data: ByteArray, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to send data to a server. Not repeatable on authentication failure.
+     *
+     * @param url        Path to the resource including protocol and hostname (must not point to a directory)
+     * @param dataStream Input source
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, dataStream: InputStream, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to send data to a server. Not repeatable on authentication failure.
+     *
+     * @param url        Path to the resource including protocol and hostname (must not point to a directory)
+     * @param onWriting  Input source using [ByteWriteChannel]
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, onWriting: suspend (channel: ByteWriteChannel) -> Unit, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to send data to a server with a specific content type
+     * header. Repeatable on authentication failure.
+     *
+     * @param url         Path to the resource including protocol and hostname (must not point to a directory)
+     * @param data        Input source
+     * @param contentType MIME type to add to the HTTP request header
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, data: ByteArray, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to send data to a server with a specific content
+     * type header. Not repeatable on authentication failure.
+     *
+     * @param url         Path to the resource including protocol and hostname (must not point to a directory)
+     * @param dataStream  Input source
+     * @param contentType MIME type to add to the HTTP request header
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to send data to a server with a specific content
+     * type header. Not repeatable on authentication failure.
+     *
+     * @param url            Path to the resource including protocol and hostname (must not point to a directory)
+     * @param dataStream     Input source
+     * @param contentType    MIME type to add to the HTTP request header
+     * @param expectContinue Enable `Expect: continue` header for `PUT` requests.
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to send data to a server with a specific content
+     * type header. Not repeatable on authentication failure.
+     *
+     * @param url            Path to the resource including protocol and hostname (must not point to a directory)
+     * @param dataStream     Input source
+     * @param contentType    MIME type to add to the HTTP request header
+     * @param expectContinue Enable `Expect: continue` header for `PUT` requests.
+     * @param contentLength data size in bytes to set to Content-Length header
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, contentLength: Long?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to send data to a server with specific headers. Not repeatable
+     * on authentication failure.
+     *
+     * @param url        Path to the resource including protocol and hostname (must not point to a directory)
+     * @param dataStream Input source
+     * @param headers    Additional HTTP headers to add to the request
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, dataStream: InputStream, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to upload file to a server with specific contentType.
+     * Repeatable on authentication failure.
+     *
+     * @param url        Path to the resource including protocol and hostname (must not point to a directory)
+     * @param localFile local file to send
+     * @param contentType    MIME type to add to the HTTP request header
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, localFile: File, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Uses `PUT` to upload file to a server with specific contentType.
+     * Repeatable on authentication failure.
+     *
+     * @param url       Path to the resource including protocol and hostname (must not point to a directory)
+     * @param localFile local file to send
+     * @param contentType   MIME type to add to the HTTP request header
+     * @param expectContinue Enable `Expect: continue` header for `PUT` requests.
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun put(url: String, localFile: File, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+
+    /**
+     * Delete a resource using HTTP `DELETE` at the specified url
+     *
+     * @param url Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun delete(url: String)
+
+    /**
+     * Delete a resource using HTTP `DELETE` at the specified url
+     *
+     * @param url Path to the resource including protocol and hostname
+     * @param headers Additional HTTP headers to add to the request
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun delete(url: String, headers: Map<String, String>)
+
+    /**
+     * Uses WebDAV `MKCOL` to create a directory at the specified url
+     *
+     * @param url Path to the resource including protocol and hostname
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun createDirectory(url: String)
+
+    /**
+     * Move a url to from source to destination using WebDAV `MOVE`. Assumes overwrite.
+     *
+     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
+     * @param destinationUrl Path to the resource including protocol and hostname
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun move(sourceUrl: String, destinationUrl: String)
+
+    /**
+     * Move a url to from source to destination using WebDAV `MOVE`.
+     *
+     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
+     * @param destinationUrl Path to the resource including protocol and hostname
+     * @param overwrite `true` to overwrite if the destination exists, `false` otherwise.
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean)
+
+    /**
+     * Move a url to from source to destination using WebDAV `MOVE`.
+     *
+     * @param sourceUrl      Path to the resource including protocol and hostname
+     * @param destinationUrl Path to the resource including protocol and hostname
+     * @param overwrite `true` to overwrite if the destination exists, `false` otherwise.
+     * @param headers Additional HTTP headers to add to the request
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>)
+
+    /**
+     * Copy a url from source to destination using WebDAV `COPY`. Assumes overwrite.
+     *
+     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
+     * @param destinationUrl Path to the resource including protocol and hostname
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun copy(sourceUrl: String, destinationUrl: String)
+
+    /**
+     * Copy a url from source to destination using WebDAV `COPY`.
+     *
+     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
+     * @param destinationUrl Path to the resource including protocol and hostname
+     * @param overwrite `true` to overwrite if the destination exists, `false` otherwise.
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean)
+
+    /**
+     * Copy a url from source to destination using WebDAV `COPY`.
+     *
+     * @param sourceUrl      Path to the resource including protocol and hostname
+     * @param destinationUrl Path to the resource including protocol and hostname
+     * @param overwrite `true` to overwrite if the destination exists, `false` otherwise.
+     * @param headers Additional HTTP headers to add to the request
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>)
+
+    /**
+     * Performs a HTTP `HEAD` request to see if a resource exists or not.
+     *
+     * @param url Path to the resource including protocol and hostname
+     * @return Anything outside of the 200-299 response code range returns false.
+     * @throws IOException I/O error or HTTP response validation failure
+     */
+    @Throws(IOException::class)
+    suspend fun exists(url: String): Boolean
 }
