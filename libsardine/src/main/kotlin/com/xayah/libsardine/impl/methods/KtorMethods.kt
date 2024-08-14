@@ -6,7 +6,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.content.ProgressListener
 import io.ktor.client.plugins.onDownload
 import io.ktor.client.request.delete
-import io.ktor.client.request.head
 import io.ktor.client.request.headers
 import io.ktor.client.request.preparePut
 import io.ktor.client.request.prepareRequest
@@ -19,7 +18,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
-import io.ktor.http.contentType
 import io.ktor.utils.io.ByteWriteChannel
 import java.io.IOException
 
@@ -47,15 +45,18 @@ class KtorMethods(private val client: HttpClient) {
     }
 
     @Throws(IOException::class)
-    suspend fun propfind(url: String, depth: Int, body: Propfind) = client.request(url) {
+    suspend fun propfind(url: String, depth: Int, body: Propfind?) = propfindPrivate(url, depth, body).validateResponse(url)
+
+    @Throws(IOException::class)
+    private suspend fun propfindPrivate(url: String, depth: Int, body: Propfind?) = client.request(url) {
         headers {
             append(HttpHeaders.Depth, getDepthString(depth))
         }
-        contentType(ContentType.Text.Plain)
-        setBody(KotlinSardineUtil.toXml(body))
+        if (body != null) {
+            setBody(KotlinSardineUtil.toXml(body))
+        }
         method = HttpMethod.parse(METHOD_PROPFIND)
-    }.validateResponse(url)
-
+    }
 
     @Throws(IOException::class)
     suspend fun <T> get(url: String, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> T): T = client.prepareRequest(url) {
@@ -121,7 +122,7 @@ class KtorMethods(private val client: HttpClient) {
     }.validateResponse(url)
 
     @Throws(IOException::class)
-    suspend fun exists(url: String) = client.head(url).validateExists(url)
+    suspend fun exists(url: String) = propfindPrivate(url, 0, null).validateExists(url)
 
     @Throws(IOException::class)
     suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>) = client.request(sourceUrl) {

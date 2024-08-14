@@ -111,6 +111,14 @@ class KtorSardineTest {
     }
 
     @Test
+    fun test_exist() {
+        runBlocking {
+            println(client.exists(url = "$server/local/testDir"))
+            println(client.exists(url = "$server/local/ghostTestDir"))
+        }
+    }
+
+    @Test
     fun test_copy() {
         runBlocking {
             client.copy(sourceUrl = "$server/local/stream.txt", destinationUrl = "$server/local/testDir/stream.txt")

@@ -20,28 +20,6 @@ interface KtorSardine {
     /**
      * Gets a directory listing using WebDAV <code>PROPFIND</code>.
      *
-     * @param url Path to the resource including protocol and hostname
-     * @return List of resources for this URI including the parent resource itself
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun list(url: String): List<DavResource>
-
-    /**
-     * Gets a directory listing using WebDAV <code>PROPFIND</code>.
-     *
-     * @param url   Path to the resource including protocol and hostname
-     * @param depth The depth to look at (use 0 for single resource, 1 for directory listing,
-     *              -1 for infinite recursion)
-     * @return List of resources for this URI including the parent resource itself
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun list(url: String, depth: Int): List<DavResource>
-
-    /**
-     * Gets a directory listing using WebDAV <code>PROPFIND</code>.
-     *
      * @param url   Path to the resource including protocol and hostname
      * @param depth The depth to look at (use 0 for single resource, 1 for directory listing,
      *              -1 for infinite recursion)
@@ -64,7 +42,7 @@ interface KtorSardine {
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun list(url: String, depth: Int, allProp: Boolean): List<DavResource>
+    suspend fun list(url: String, depth: Int = 1, allProp: Boolean = true): List<DavResource>
 
     /**
      * Fetches a resource using WebDAV <code>PROPFIND</code>. Only the specified properties
@@ -83,17 +61,6 @@ interface KtorSardine {
     /**
      * Uses HTTP `GET` to download data from a server. The stream must be closed after reading.
      *
-     * @param url Path to the resource including protocol and hostname
-     * @param listener Callback that can be registered to listen for upload/ download progress, see [io.ktor.client.content.ProgressListener]
-     * @param block See [io.ktor.client.statement.HttpStatement.execute]
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun <T> get(url: String, listener: ProgressListener? = null, block: suspend (response: HttpResponse) -> T): T
-
-    /**
-     * Uses HTTP `GET` to download data from a server. The stream must be closed after reading.
-     *
      * @param url     Path to the resource including protocol and hostname
      * @param headers Additional HTTP headers to add to the request
      * @param listener Callback that can be registered to listen for upload/ download progress, see [io.ktor.client.content.ProgressListener]
@@ -101,27 +68,7 @@ interface KtorSardine {
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun <T> get(url: String, headers: Map<String, String>, listener: ProgressListener? = null, block: suspend (response: HttpResponse) -> T): T
-
-    /**
-     * Uses HTTP `PUT` to send data to a server. Repeatable on authentication failure.
-     *
-     * @param url  Path to the resource including protocol and hostname (must not point to a directory)
-     * @param data Input source
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun put(url: String, data: ByteArray, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
-
-    /**
-     * Uses `PUT` to send data to a server. Not repeatable on authentication failure.
-     *
-     * @param url        Path to the resource including protocol and hostname (must not point to a directory)
-     * @param dataStream Input source
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun put(url: String, dataStream: InputStream, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+    suspend fun <T> get(url: String, headers: Map<String, String> = emptyMap(), listener: ProgressListener? = null, block: suspend (response: HttpResponse) -> T): T
 
     /**
      * Uses `PUT` to send data to a server. Not repeatable on authentication failure.
@@ -140,35 +87,12 @@ interface KtorSardine {
      * @param url         Path to the resource including protocol and hostname (must not point to a directory)
      * @param data        Input source
      * @param contentType MIME type to add to the HTTP request header
+     * @param listener Callback that can be registered to listen for upload/ download progress, see [io.ktor.client.content.ProgressListener]
+     * @param block See [io.ktor.client.statement.HttpStatement.execute]
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun put(url: String, data: ByteArray, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
-
-    /**
-     * Uses `PUT` to send data to a server with a specific content
-     * type header. Not repeatable on authentication failure.
-     *
-     * @param url         Path to the resource including protocol and hostname (must not point to a directory)
-     * @param dataStream  Input source
-     * @param contentType MIME type to add to the HTTP request header
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
-
-    /**
-     * Uses `PUT` to send data to a server with a specific content
-     * type header. Not repeatable on authentication failure.
-     *
-     * @param url            Path to the resource including protocol and hostname (must not point to a directory)
-     * @param dataStream     Input source
-     * @param contentType    MIME type to add to the HTTP request header
-     * @param expectContinue Enable `Expect: continue` header for `PUT` requests.
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+    suspend fun put(url: String, data: ByteArray, contentType: ContentType? = null, listener: ProgressListener? = null, block: suspend (response: HttpResponse) -> Unit)
 
     /**
      * Uses `PUT` to send data to a server with a specific content
@@ -179,34 +103,22 @@ interface KtorSardine {
      * @param contentType    MIME type to add to the HTTP request header
      * @param expectContinue Enable `Expect: continue` header for `PUT` requests.
      * @param contentLength data size in bytes to set to Content-Length header
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, contentLength: Long?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
-
-    /**
-     * Uses `PUT` to send data to a server with specific headers. Not repeatable
-     * on authentication failure.
-     *
-     * @param url        Path to the resource including protocol and hostname (must not point to a directory)
-     * @param dataStream Input source
      * @param headers    Additional HTTP headers to add to the request
+     * @param listener Callback that can be registered to listen for upload/ download progress, see [io.ktor.client.content.ProgressListener]
+     * @param block See [io.ktor.client.statement.HttpStatement.execute]
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun put(url: String, dataStream: InputStream, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
-
-    /**
-     * Uses `PUT` to upload file to a server with specific contentType.
-     * Repeatable on authentication failure.
-     *
-     * @param url        Path to the resource including protocol and hostname (must not point to a directory)
-     * @param localFile local file to send
-     * @param contentType    MIME type to add to the HTTP request header
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun put(url: String, localFile: File, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
+    suspend fun put(
+        url: String,
+        dataStream: InputStream,
+        contentType: ContentType? = null,
+        expectContinue: Boolean = true,
+        contentLength: Long? = null,
+        headers: Map<String, String> = emptyMap(),
+        listener: ProgressListener? = null,
+        block: suspend (response: HttpResponse) -> Unit
+    )
 
     /**
      * Uses `PUT` to upload file to a server with specific contentType.
@@ -216,19 +128,12 @@ interface KtorSardine {
      * @param localFile local file to send
      * @param contentType   MIME type to add to the HTTP request header
      * @param expectContinue Enable `Expect: continue` header for `PUT` requests.
+     * @param listener Callback that can be registered to listen for upload/ download progress, see [io.ktor.client.content.ProgressListener]
+     * @param block See [io.ktor.client.statement.HttpStatement.execute]
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun put(url: String, localFile: File, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit)
-
-    /**
-     * Delete a resource using HTTP `DELETE` at the specified url
-     *
-     * @param url Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun delete(url: String)
+    suspend fun put(url: String, localFile: File, contentType: ContentType?, expectContinue: Boolean = false, listener: ProgressListener? = null, block: suspend (response: HttpResponse) -> Unit)
 
     /**
      * Delete a resource using HTTP `DELETE` at the specified url
@@ -238,7 +143,7 @@ interface KtorSardine {
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun delete(url: String, headers: Map<String, String>)
+    suspend fun delete(url: String, headers: Map<String, String> = emptyMap())
 
     /**
      * Uses WebDAV `MKCOL` to create a directory at the specified url
@@ -250,27 +155,6 @@ interface KtorSardine {
     suspend fun createDirectory(url: String)
 
     /**
-     * Move a url to from source to destination using WebDAV `MOVE`. Assumes overwrite.
-     *
-     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
-     * @param destinationUrl Path to the resource including protocol and hostname
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun move(sourceUrl: String, destinationUrl: String)
-
-    /**
-     * Move a url to from source to destination using WebDAV `MOVE`.
-     *
-     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
-     * @param destinationUrl Path to the resource including protocol and hostname
-     * @param overwrite `true` to overwrite if the destination exists, `false` otherwise.
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean)
-
-    /**
      * Move a url to from source to destination using WebDAV `MOVE`.
      *
      * @param sourceUrl      Path to the resource including protocol and hostname
@@ -280,28 +164,7 @@ interface KtorSardine {
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>)
-
-    /**
-     * Copy a url from source to destination using WebDAV `COPY`. Assumes overwrite.
-     *
-     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
-     * @param destinationUrl Path to the resource including protocol and hostname
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun copy(sourceUrl: String, destinationUrl: String)
-
-    /**
-     * Copy a url from source to destination using WebDAV `COPY`.
-     *
-     * @param sourceUrl      Path to the resource including protocol and hostname (trailing slash is mandatory for directories)
-     * @param destinationUrl Path to the resource including protocol and hostname
-     * @param overwrite `true` to overwrite if the destination exists, `false` otherwise.
-     * @throws IOException I/O error or HTTP response validation failure
-     */
-    @Throws(IOException::class)
-    suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean)
+    suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean = true, headers: Map<String, String> = emptyMap())
 
     /**
      * Copy a url from source to destination using WebDAV `COPY`.
@@ -313,7 +176,7 @@ interface KtorSardine {
      * @throws IOException I/O error or HTTP response validation failure
      */
     @Throws(IOException::class)
-    suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>)
+    suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean = true, headers: Map<String, String> = emptyMap())
 
     /**
      * Performs a HTTP `HEAD` request to see if a resource exists or not.

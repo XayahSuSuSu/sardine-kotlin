@@ -118,16 +118,6 @@ class KtorSardineImpl : KtorSardine {
     }
 
     @Throws(IOException::class)
-    override suspend fun list(url: String): List<DavResource> {
-        return list(url, 1)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun list(url: String, depth: Int): List<DavResource> {
-        return list(url, depth, true)
-    }
-
-    @Throws(IOException::class)
     override suspend fun list(url: String, depth: Int, props: Set<QName>): List<DavResource> {
         val body = Propfind()
         val prop = Prop()
@@ -139,9 +129,9 @@ class KtorSardineImpl : KtorSardine {
         prop.resourcetype = Resourcetype()
         prop.getetag = Getetag()
         prop.lockdiscovery = Lockdiscovery()
-        addCustomProperties(prop, props)
+        addCustomProperties(prop = prop, props = props)
         body.prop = prop
-        return propfind(url, depth, body)
+        return propfind(url = url, depth = depth, body = body)
     }
 
     @Throws(IOException::class)
@@ -149,9 +139,9 @@ class KtorSardineImpl : KtorSardine {
         if (allProp) {
             val body = Propfind()
             body.allprop = Allprop()
-            return propfind(url, depth, body)
+            return propfind(url = url, depth = depth, body = body)
         } else {
-            return list(url, depth, emptySet())
+            return list(url = url, depth = depth, props = emptySet())
         }
     }
 
@@ -159,87 +149,41 @@ class KtorSardineImpl : KtorSardine {
     override suspend fun propfind(url: String, depth: Int, props: Set<QName>): List<DavResource> {
         val body = Propfind()
         val prop = Prop()
-        addCustomProperties(prop, props)
+        addCustomProperties(prop = prop, props = props)
         body.prop = prop
-        return propfind(url, depth, body)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun <T> get(url: String, listener: ProgressListener?, block: suspend (response: HttpResponse) -> T): T {
-        return get(url, mapOf(), listener, block)
+        return propfind(url = url, depth = depth, body = body)
     }
 
     @Throws(IOException::class)
     override suspend fun <T> get(url: String, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> T): T {
-        return methods.get(url, headers, listener, block)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun put(url: String, data: ByteArray, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        put(url, data, null, listener, block)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun put(url: String, dataStream: InputStream, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        put(url, dataStream, null, listener, block)
+        return methods.get(url = url, headers = headers, listener = listener, block = block)
     }
 
     @Throws(IOException::class)
     override suspend fun put(url: String, onWriting: suspend (channel: ByteWriteChannel) -> Unit, block: suspend (response: HttpResponse) -> Unit) {
-        put(
-            url = url,
-            onWriting = onWriting,
-            contentLength = null,
-            contentType = null,
-            headers = emptyMap(),
-            block = block
-        )
+        put(url = url, onWriting = onWriting, contentLength = null, contentType = null, headers = emptyMap(), block = block)
     }
 
     @Throws(IOException::class)
     override suspend fun put(url: String, data: ByteArray, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        put(url, ByteArrayInputStream(data), contentType, true, data.size.toLong(), listener, block)
+        put(url = url, dataStream = ByteArrayInputStream(data), contentType = contentType, contentLength = data.size.toLong(), listener = listener, block = block)
     }
 
     @Throws(IOException::class)
-    override suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        put(url, dataStream, contentType, true, listener, block)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
+    override suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, contentLength: Long?, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
         // If contentLength is null, the resources will be sent as `Transfer-Encoding: chunked`
-        put(url, dataStream, contentType, expectContinue, null, listener, block)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun put(url: String, dataStream: InputStream, contentType: ContentType?, expectContinue: Boolean, contentLength: Long?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        val headers: MutableMap<String, String> = mutableMapOf()
+        val _headers: MutableMap<String, String> = mutableMapOf()
         if (expectContinue) {
-            headers[HttpHeaders.Expect] = "100-continue"
+            _headers[HttpHeaders.Expect] = "100-continue"
         }
-        put(url, dataStream, contentLength, contentType, headers, listener, block)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun put(url: String, dataStream: InputStream, headers: Map<String, String>, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        put(url, dataStream, null, null, headers, listener, block)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun put(url: String, localFile: File, contentType: ContentType?, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        // Don't use ExpectContinue for repeatable FileEntity, some web server (IIS for example) may return 400 bad request after retry
-        put(url, localFile, contentType, false, listener, block)
+        _headers.putAll(headers)
+        put(url = url, dataStream = dataStream, contentLength = contentLength, contentType = contentType, headers = _headers, listener = listener, block = block)
     }
 
     @Throws(IOException::class)
     override suspend fun put(url: String, localFile: File, contentType: ContentType?, expectContinue: Boolean, listener: ProgressListener?, block: suspend (response: HttpResponse) -> Unit) {
-        put(url, localFile.inputStream(), contentType, expectContinue, localFile.length(), listener, block)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun delete(url: String) {
-        delete(url, emptyMap())
+        // Don't use ExpectContinue for repeatable FileEntity, some web server (IIS for example) may return 400 bad request after retry
+        put(url = url, dataStream = localFile.inputStream(), contentType = contentType, expectContinue = expectContinue, contentLength = localFile.length(), headers = emptyMap(), listener = listener, block = block)
     }
 
     @Throws(IOException::class)
@@ -253,28 +197,8 @@ class KtorSardineImpl : KtorSardine {
     }
 
     @Throws(IOException::class)
-    override suspend fun move(sourceUrl: String, destinationUrl: String) {
-        move(sourceUrl, destinationUrl, true)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean) {
-        move(sourceUrl, destinationUrl, overwrite, emptyMap())
-    }
-
-    @Throws(IOException::class)
     override suspend fun move(sourceUrl: String, destinationUrl: String, overwrite: Boolean, headers: Map<String, String>) {
         methods.move(sourceUrl, destinationUrl, overwrite, headers)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun copy(sourceUrl: String, destinationUrl: String) {
-        copy(sourceUrl, destinationUrl, true)
-    }
-
-    @Throws(IOException::class)
-    override suspend fun copy(sourceUrl: String, destinationUrl: String, overwrite: Boolean) {
-        copy(sourceUrl, destinationUrl, overwrite, emptyMap())
     }
 
     @Throws(IOException::class)
